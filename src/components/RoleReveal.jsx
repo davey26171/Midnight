@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, User, Sparkles } from 'lucide-react';
+import { useProgression } from '../contexts/ProgressionContext';
+import { AGENT_CARDS, SPY_CARDS, DOUBLE_AGENT_CARDS } from '../data/cardData';
 
 export default function RoleReveal({ gameData, players, setGameState }) {
     const [currentPlayerIdx, setCurrentPlayerIdx] = useState(0);
@@ -7,8 +9,21 @@ export default function RoleReveal({ gameData, players, setGameState }) {
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [showRevealEffect, setShowRevealEffect] = useState(false);
 
+    // Get equipped cards from progression
+    const { equippedCards } = useProgression();
+
+    // Get equipped card images
+    const equippedAgentCard = AGENT_CARDS.find(c => c.id === equippedCards?.agent) || AGENT_CARDS[0];
+    const equippedSpyCard = SPY_CARDS.find(c => c.id === equippedCards?.spy) || SPY_CARDS[0];
+    const equippedDoubleAgentCard = DOUBLE_AGENT_CARDS.find(c => c.id === equippedCards?.doubleAgent) || DOUBLE_AGENT_CARDS[0];
+
     const currentPlayer = players[currentPlayerIdx];
+    const playerRole = gameData.roleMap ? gameData.roleMap[currentPlayer] : null;
     const isSpy = gameData.spies.includes(currentPlayer);
+    const isDoubleAgent = gameData.doubleAgent === currentPlayer;
+    const isAssassin = playerRole === 'assassin';
+    const isInnocent = playerRole === 'innocent';
+    const isAgent = !isSpy && !isDoubleAgent && !isAssassin && !isInnocent;
 
     // Dramatic reveal effect when card flips
     useEffect(() => {
@@ -168,13 +183,19 @@ export default function RoleReveal({ gameData, players, setGameState }) {
 
                         {/* BACK OF CARD */}
                         <div className="flip-card-back" style={{
-                            backgroundImage: isSpy ? 'url("/spy-card.png")' : 'url("/agent-card.png")',
+                            backgroundImage: `url("${(isSpy || isAssassin) ? equippedSpyCard.image : isDoubleAgent ? equippedDoubleAgentCard.image : equippedAgentCard.image}")`,
                             backgroundSize: 'cover',
                             backgroundPosition: 'center',
                             boxShadow: isSpy
                                 ? '0 0 60px rgba(239, 68, 68, 0.4), 0 20px 60px rgba(0,0,0,0.5)'
-                                : '0 0 60px var(--accent-glow), 0 20px 60px rgba(0,0,0,0.5)',
-                            border: `3px solid ${isSpy ? '#ef4444' : 'var(--accent)'}`
+                                : isAssassin
+                                    ? '0 0 60px rgba(127, 29, 29, 0.6), 0 20px 60px rgba(0,0,0,0.5)'
+                                    : isDoubleAgent
+                                        ? '0 0 60px rgba(168, 85, 247, 0.4), 0 20px 60px rgba(0,0,0,0.5)'
+                                        : isInnocent
+                                            ? '0 0 60px rgba(245, 158, 11, 0.4), 0 20px 60px rgba(0,0,0,0.5)'
+                                            : '0 0 60px var(--accent-glow), 0 20px 60px rgba(0,0,0,0.5)',
+                            border: `3px solid ${isSpy ? '#ef4444' : isAssassin ? '#7f1d1d' : isDoubleAgent ? '#a855f7' : isInnocent ? '#f59e0b' : 'var(--accent)'}`
                         }}>
                             {/* Role Info Overlay */}
                             <div style={{
@@ -189,7 +210,7 @@ export default function RoleReveal({ gameData, players, setGameState }) {
                                 <h3
                                     className={isFlipped ? 'animate-text-reveal' : ''}
                                     style={{
-                                        color: isSpy ? '#ef4444' : 'var(--accent-light)',
+                                        color: isSpy ? '#ef4444' : isAssassin ? '#991b1b' : isDoubleAgent ? '#a855f7' : isInnocent ? '#f59e0b' : 'var(--accent-light)',
                                         fontSize: '1.6rem',
                                         marginBottom: 12,
                                         textTransform: 'uppercase',
@@ -197,13 +218,19 @@ export default function RoleReveal({ gameData, players, setGameState }) {
                                         fontWeight: 800,
                                         textShadow: isSpy
                                             ? '0 0 20px rgba(239,68,68,0.5)'
-                                            : '0 0 20px var(--accent-glow)'
+                                            : isAssassin
+                                                ? '0 0 20px rgba(127,29,29,0.5)'
+                                                : isDoubleAgent
+                                                    ? '0 0 20px rgba(168,85,247,0.5)'
+                                                    : isInnocent
+                                                        ? '0 0 20px rgba(245,158,11,0.5)'
+                                                        : '0 0 20px var(--accent-glow)'
                                     }}
                                 >
-                                    {isSpy ? 'THE SPY' : 'AGENT'}
+                                    {isSpy ? 'THE SPY' : isAssassin ? 'ASSASSIN' : isDoubleAgent ? 'DOUBLE AGENT' : isInnocent ? 'INNOCENT' : 'AGENT'}
                                 </h3>
 
-                                {!isSpy && (
+                                {isAgent && (
                                     <div
                                         className={isFlipped ? 'animate-spring-in' : ''}
                                         style={{
@@ -238,6 +265,73 @@ export default function RoleReveal({ gameData, players, setGameState }) {
                                         }}
                                     >
                                         Blend in. Don't get caught.
+                                    </p>
+                                )}
+
+                                {isDoubleAgent && (
+                                    <div
+                                        className={isFlipped ? 'animate-spring-in' : ''}
+                                        style={{
+                                            background: 'rgba(168, 85, 247, 0.15)',
+                                            padding: '12px 16px',
+                                            borderRadius: '10px',
+                                            border: '1px solid #a855f7'
+                                        }}
+                                    >
+                                        <p style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                                            Secret Word
+                                        </p>
+                                        <p style={{
+                                            fontSize: '1rem',
+                                            color: 'white',
+                                            fontWeight: 700,
+                                            marginBottom: 8
+                                        }}>
+                                            {gameData.word}
+                                        </p>
+                                        <p style={{
+                                            color: 'rgba(255,255,255,0.75)',
+                                            fontSize: '0.8rem',
+                                            fontStyle: 'italic'
+                                        }}>
+                                            Pretend to be an agent.<br />Secretly help the spy win.
+                                            {gameData.spies?.length > 0 && (
+                                                <>
+                                                    <br /><br />
+                                                    <span style={{ fontWeight: 700, color: '#ef4444', textShadow: '0 0 10px rgba(239,68,68,0.3)' }}>
+                                                        Spies: {gameData.spies.join(', ')}
+                                                    </span>
+                                                </>
+                                            )}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {isAssassin && (
+                                    <p
+                                        className={isFlipped ? 'animate-fade-in' : ''}
+                                        style={{
+                                            color: 'rgba(255,255,255,0.8)',
+                                            fontSize: '0.9rem',
+                                            fontStyle: 'italic',
+                                            textShadow: '0 2px 10px rgba(0,0,0,0.5)'
+                                        }}
+                                    >
+                                        Blend in. You can eliminate 1 player silently.
+                                    </p>
+                                )}
+
+                                {isInnocent && (
+                                    <p
+                                        className={isFlipped ? 'animate-fade-in' : ''}
+                                        style={{
+                                            color: 'rgba(255,255,255,0.8)',
+                                            fontSize: '0.9rem',
+                                            fontStyle: 'italic',
+                                            textShadow: '0 2px 10px rgba(0,0,0,0.5)'
+                                        }}
+                                    >
+                                        You're an agent, but you don't know the word!
                                     </p>
                                 )}
                             </div>

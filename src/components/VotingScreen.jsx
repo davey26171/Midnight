@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { User, Shield, Skull, X, CheckCircle } from 'lucide-react';
 import { useSound } from '../contexts/SoundContext';
 
-export default function VotingScreen({ players, gameData, setGameState, setPlayers, gameData: currentGameData, setGameData }) {
+export default function VotingScreen({ players, gameData, setGameState, setPlayers, gameData: currentGameData, setGameData, isMultiplayer = false }) {
     const { playSfx } = useSound();
     const [selectedPlayer, setSelectedPlayer] = useState(null);
     const [hasVoted, setHasVoted] = useState(false);
     const [votedOut, setVotedOut] = useState(null);
     const [showReveal, setShowReveal] = useState(false);
+    const [confidence, setConfidence] = useState(75);
+    const [notes, setNotes] = useState('');
+    const [anonymousVoting, setAnonymousVoting] = useState(false);
 
     const handleVote = (player) => {
         if (hasVoted) return;
@@ -127,9 +130,28 @@ export default function VotingScreen({ players, gameData, setGameState, setPlaye
     return (
         <div className="screen-container">
             <div className="animate-spring-in" style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ marginBottom: 24 }}>
+                <div style={{ marginBottom: 20 }}>
                     <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: 8 }}>Vote to Eject</h2>
                     <p style={{ color: 'var(--text-muted)' }}>Who is the spy?</p>
+
+                    {/* Anonymous Voting Toggle - Multiplayer Only */}
+                    {isMultiplayer && (
+                        <button
+                            onClick={() => setAnonymousVoting(!anonymousVoting)}
+                            style={{
+                                marginTop: 12,
+                                padding: '6px 12px',
+                                background: anonymousVoting ? 'var(--accent-glow)' : 'rgba(0,0,0,0.2)',
+                                border: `1px solid ${anonymousVoting ? 'var(--accent)' : 'var(--border)'}`,
+                                borderRadius: 8,
+                                fontSize: '0.8rem',
+                                cursor: 'pointer',
+                                color: 'var(--text-secondary)'
+                            }}
+                        >
+                            {anonymousVoting ? '🔒 Anonymous' : '👁️ Public'} Voting
+                        </button>
+                    )}
                 </div>
 
                 <div style={{
@@ -188,6 +210,50 @@ export default function VotingScreen({ players, gameData, setGameState, setPlaye
                         </button>
                     ))}
                 </div>
+
+                {/* Confidence & Notes - Multiplayer Only */}
+                {isMultiplayer && selectedPlayer && !hasVoted && (
+                    <div className="glass-card animate-fade-in" style={{ padding: 16, marginTop: 16 }}>
+                        <div style={{ marginBottom: 16 }}>
+                            <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>
+                                Confidence: {confidence}%
+                            </label>
+                            <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={confidence}
+                                onChange={(e) => setConfidence(Number(e.target.value))}
+                                style={{
+                                    width: '100%',
+                                    accentColor: 'var(--accent)'
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>
+                                Notes (optional):
+                            </label>
+                            <textarea
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                                placeholder="Why do you suspect them?"
+                                maxLength={100}
+                                style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    background: 'rgba(0,0,0,0.3)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 8,
+                                    color: 'var(--text-primary)',
+                                    fontSize: '0.85rem',
+                                    resize: 'none',
+                                    minHeight: 60
+                                }}
+                            />
+                        </div>
+                    </div>
+                )}
 
                 {hasVoted && !showReveal && (
                     <div className="animate-pop" style={{

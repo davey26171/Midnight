@@ -1,8 +1,29 @@
 import React, { useState } from 'react';
-import { Play, BookOpen, RotateCcw } from 'lucide-react';
+import { Play, RotateCcw, Users, ShoppingBag } from 'lucide-react';
+import ThemeSelector from './ThemeSelector';
+import MultiplayerGame from './MultiplayerGame';
+import Store from './Store';
 
-export default function HomeScreen({ onStartGame, onContinue, hasSavedGame }) {
-    const [showRules, setShowRules] = useState(false);
+export default function HomeScreen({ onStartGame, onContinue, hasSavedGame, onMultiplayerStart }) {
+    const [showThemes, setShowThemes] = useState(false);
+    const [showMultiplayer, setShowMultiplayer] = useState(false);
+    const [showStore, setShowStore] = useState(false);
+
+    if (showMultiplayer) {
+        return (
+            <MultiplayerGame
+                onBack={() => setShowMultiplayer(false)}
+            />
+        );
+    }
+
+    if (showStore) {
+        return (
+            <Store
+                onBack={() => setShowStore(false)}
+            />
+        );
+    }
 
     return (
         <div className="screen-container" style={{ padding: 0, position: 'relative', overflow: 'hidden' }}>
@@ -71,7 +92,7 @@ export default function HomeScreen({ onStartGame, onContinue, hasSavedGame }) {
                         <h1 style={{
                             fontSize: '1.75rem',
                             fontWeight: 700,
-                            background: 'linear-gradient(135deg, #fff, #c4b5fd)',
+                            background: 'linear-gradient(135deg, var(--text-primary), var(--accent-light))',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             letterSpacing: '-0.02em'
@@ -144,12 +165,11 @@ export default function HomeScreen({ onStartGame, onContinue, hasSavedGame }) {
                     </button>
 
                     <button
-                        onClick={() => setShowRules(true)}
+                        onClick={() => setShowMultiplayer(true)}
                         className="animate-fade-in stagger-2"
                         style={{
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            backdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            border: 'none',
                             borderRadius: 16,
                             padding: '18px 24px',
                             color: 'white',
@@ -161,11 +181,38 @@ export default function HomeScreen({ onStartGame, onContinue, hasSavedGame }) {
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: 10,
+                            boxShadow: '0 8px 32px rgba(16, 185, 129, 0.4)',
                             transition: 'all 0.25s ease'
                         }}
                     >
-                        <BookOpen size={20} />
-                        Read Rules
+                        <Users size={20} />
+                        Multiplayer
+                    </button>
+
+                    {/* Store Button */}
+                    <button
+                        onClick={() => setShowStore(true)}
+                        className="animate-fade-in stagger-4"
+                        style={{
+                            background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                            border: 'none',
+                            borderRadius: 16,
+                            padding: '16px 24px',
+                            color: 'white',
+                            fontSize: '1rem',
+                            fontWeight: 600,
+                            fontFamily: "'DM Sans', sans-serif",
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 10,
+                            boxShadow: '0 8px 32px rgba(234, 179, 8, 0.3)',
+                            transition: 'all 0.25s ease'
+                        }}
+                    >
+                        <ShoppingBag size={18} />
+                        Store
                     </button>
                 </div>
 
@@ -181,101 +228,8 @@ export default function HomeScreen({ onStartGame, onContinue, hasSavedGame }) {
                 </p>
             </div>
 
-            {/* Rules Modal */}
-            {showRules && (
-                <div
-                    onClick={() => setShowRules(false)}
-                    style={{
-                        position: 'fixed',
-                        inset: 0,
-                        background: 'rgba(0, 0, 0, 0.85)',
-                        backdropFilter: 'blur(8px)',
-                        zIndex: 100,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: 24
-                    }}
-                >
-                    <div
-                        className="animate-scale-in"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                            maxWidth: 380,
-                            width: '100%',
-                            maxHeight: '80vh',
-                            overflow: 'auto',
-                            padding: 24,
-                            background: 'rgba(24, 26, 40, 0.95)',
-                            borderRadius: 24,
-                            border: '1px solid rgba(255,255,255,0.1)'
-                        }}
-                    >
-                        <h2 style={{
-                            fontSize: '1.5rem',
-                            marginBottom: 20,
-                            textAlign: 'center',
-                            background: 'linear-gradient(135deg, #fff, #a855f7)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent'
-                        }}>
-                            How to Play
-                        </h2>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                            {[
-                                { num: '1', title: 'Setup', desc: 'Add 3-16 players and choose a topic.' },
-                                { num: '2', title: 'Roles', desc: 'One player is the Spy. Others see the secret word.' },
-                                { num: '3', title: 'Discuss', desc: 'Take turns asking questions about the word.' },
-                                { num: '4', title: 'Find Spy', desc: 'Spy blends in. Others try to identify them.' },
-                                { num: '5', title: 'Vote', desc: 'Vote on who the Spy is before time runs out!' }
-                            ].map((step, i) => (
-                                <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                                    <div style={{
-                                        width: 28,
-                                        height: 28,
-                                        borderRadius: '50%',
-                                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '0.85rem',
-                                        fontWeight: 700,
-                                        flexShrink: 0
-                                    }}>
-                                        {step.num}
-                                    </div>
-                                    <div>
-                                        <strong style={{ color: '#fff', fontSize: '0.95rem' }}>{step.title}</strong>
-                                        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginTop: 2 }}>
-                                            {step.desc}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <button
-                            onClick={() => setShowRules(false)}
-                            style={{
-                                width: '100%',
-                                marginTop: 24,
-                                padding: '14px',
-                                background: 'rgba(255,255,255,0.1)',
-                                border: '1px solid rgba(255,255,255,0.15)',
-                                borderRadius: 12,
-                                color: 'white',
-                                fontSize: '1rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                fontFamily: "'DM Sans', sans-serif"
-                            }}
-                        >
-                            Got it!
-                        </button>
-                    </div>
-                </div>
-            )}
+            {/* Theme Selector */}
+            {showThemes && <ThemeSelector onClose={() => setShowThemes(false)} />}
         </div>
     );
 }

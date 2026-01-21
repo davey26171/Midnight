@@ -89,7 +89,7 @@ export default function GameBoard({ timer, setGameState, players, gameData, rese
             </div>
 
             {/* Suspect Tracking */}
-            <div className="glass-card animate-fade-in stagger-1">
+            <div className="glass-card animate-fade-in stagger-1" style={{ marginTop: 24 }}>
                 <h3 style={{
                     marginBottom: 12,
                     color: 'var(--text-secondary)',
@@ -145,7 +145,8 @@ export default function GameBoard({ timer, setGameState, players, gameData, rese
                 style={{
                     cursor: 'pointer',
                     borderStyle: 'dashed',
-                    borderColor: showWord ? 'var(--accent)' : 'var(--border)'
+                    borderColor: showWord ? 'var(--accent)' : 'var(--border)',
+                    marginTop: 24
                 }}
             >
                 <div style={{

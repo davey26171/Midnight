@@ -118,6 +118,11 @@ class AudioSynth {
 
     // Background Music (uses single music.mp3 file)
     startMusic(type) {
+        // Don't restart if already playing
+        if (this.menuAudio && !this.menuAudio.paused) {
+            return;
+        }
+
         this.stopMusic();
         if (this.isMuted) return;
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { GameEngineProvider } from './GameEngine';
 import { SoundProvider, useSound } from './contexts/SoundContext';
+import { ProgressionProvider } from './contexts/ProgressionContext';
 import HomeScreen from './components/HomeScreen';
 import Lobby from './components/Lobby';
 import RoleReveal from './components/RoleReveal';
@@ -332,40 +334,55 @@ function AppContent({ gameState, setGameState, continueGame, hasSavedGame, ...pr
     }, [gameState, playSfx]);
 
     return (
-        <>
-            {(() => {
-                switch (gameState) {
-                    case 'HOME':
-                        return (
-                            <HomeScreen
-                                onStartGame={() => setGameState('LOBBY')}
-                                onContinue={continueGame}
-                                hasSavedGame={hasSavedGame}
-                            />
-                        );
-                    case 'LOBBY':
-                        return <Lobby {...props} setGameState={setGameState} />;
-                    case 'REVEAL':
-                        return <RoleReveal {...props} setGameState={setGameState} />;
-                    case 'PLAYING':
-                        return <GameBoard {...props} setGameState={setGameState} />;
-                    case 'VOTING':
-                        return <VotingScreen {...props} setGameState={setGameState} />;
-                    case 'RESULTS_SPY_WIN':
-                        return <Results winner="SPY" {...props} resetGame={() => setGameState('HOME')} />;
-                    case 'RESULTS_AGENTS_WIN':
-                        return <Results winner="AGENTS" {...props} resetGame={() => setGameState('HOME')} />;
-                    default:
-                        return (
-                            <HomeScreen
-                                onStartGame={() => setGameState('LOBBY')}
-                                onContinue={continueGame}
-                                hasSavedGame={hasSavedGame}
-                            />
-                        );
-                }
-            })()}
-        </>
+        <AnimatePresence mode="wait">
+            <motion.div
+                key={gameState}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+                style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }}
+            >
+                {(() => {
+                    switch (gameState) {
+                        case 'HOME':
+                            return (
+                                <HomeScreen
+                                    onStartGame={() => setGameState('LOBBY')}
+                                    onContinue={continueGame}
+                                    hasSavedGame={hasSavedGame}
+                                    onMultiplayerStart={(data) => {
+                                        // Set multiplayer game data and start
+                                        if (props.setPlayers) props.setPlayers(data.players);
+                                        if (props.setGameData) props.setGameData(data.gameData);
+                                        setGameState('REVEAL');
+                                    }}
+                                />
+                            );
+                        case 'LOBBY':
+                            return <Lobby {...props} setGameState={setGameState} onBack={() => setGameState('HOME')} />;
+                        case 'REVEAL':
+                            return <RoleReveal {...props} setGameState={setGameState} />;
+                        case 'PLAYING':
+                            return <GameBoard {...props} setGameState={setGameState} />;
+                        case 'VOTING':
+                            return <VotingScreen {...props} setGameState={setGameState} />;
+                        case 'RESULTS_SPY_WIN':
+                            return <Results winner="SPY" {...props} resetGame={() => setGameState('HOME')} />;
+                        case 'RESULTS_AGENTS_WIN':
+                            return <Results winner="AGENTS" {...props} resetGame={() => setGameState('HOME')} />;
+                        default:
+                            return (
+                                <HomeScreen
+                                    onStartGame={() => setGameState('LOBBY')}
+                                    onContinue={continueGame}
+                                    hasSavedGame={hasSavedGame}
+                                />
+                            );
+                    }
+                })()}
+            </motion.div>
+        </AnimatePresence>
     );
 }
 
@@ -378,9 +395,11 @@ function App() {
 
     return (
         <SoundProvider>
-            <GameEngineProvider>
-                <AppContent />
-            </GameEngineProvider>
+            <ProgressionProvider>
+                <GameEngineProvider>
+                    <AppContent />
+                </GameEngineProvider>
+            </ProgressionProvider>
         </SoundProvider>
     );
 }

@@ -1,26 +1,75 @@
 import React, { useState } from 'react';
-import { Users, Plus, Play, X, Globe, Edit2, HelpCircle, ChevronDown, ChevronUp, Clock, Gamepad2, Target, Brain, Volume2, VolumeX, Trophy } from 'lucide-react';
-import SpyDetector from './minigames/SpyDetector';
-import MemoryAgent from './minigames/MemoryAgent';
+import { Users, Plus, Play, X, Globe, Edit2, HelpCircle, ChevronDown, ChevronUp, Clock, Gamepad2, Lock, Activity, Search, MessageSquare, Trophy, Volume2, VolumeX, MessageCircle, AlertTriangle, FileText, ArrowLeft, Palette, Bookmark, UserPlus } from 'lucide-react';
+import CodeBreaker from './minigames/CodeBreaker';
+import LieDetector from './minigames/LieDetector';
+import EvidenceCollection from './minigames/EvidenceCollection';
+import InterrogationRoom from './minigames/InterrogationRoom';
 import Achievements from './Achievements';
+import ThemeSelector from './ThemeSelector';
 import { GameIcon } from '../icons';
 import { useSound } from '../contexts/SoundContext';
 
-export default function Lobby({ players, setPlayers, topic, setTopic, startGame, timer, setTimer, spyCount, setSpyCount, TOPICS, generateWordsFromTopic }) {
+const SAVED_PLAYERS_KEY = 'midnight_singleplayer_names';
+const SAVED_NAMES_KEY = 'midnight_saved_names_list';
+
+export default function Lobby({ players, setPlayers, topic, setTopic, startGame, timer, setTimer, spyCount, setSpyCount, gameMode, setGameMode, TOPICS, generateWordsFromTopic, onBack }) {
     const [customTopic, setCustomTopic] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [editingIndex, setEditingIndex] = useState(null);
     const [editValue, setEditValue] = useState('');
     const [showTutorial, setShowTutorial] = useState(false);
     const [showMinigames, setShowMinigames] = useState(false);
+    const [showGameModes, setShowGameModes] = useState(false);
     const [activeMinigame, setActiveMinigame] = useState(null);
 
     const { isMuted, toggleMute } = useSound();
     const [showAchievements, setShowAchievements] = useState(false);
+    const [showThemes, setShowThemes] = useState(false);
+
+    // Saved names feature
+    const [savedNames, setSavedNames] = useState(() => {
+        try {
+            const saved = localStorage.getItem(SAVED_NAMES_KEY);
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
+    const [showSavedNames, setShowSavedNames] = useState(false);
+
+    // Save saved names to localStorage
+    React.useEffect(() => {
+        localStorage.setItem(SAVED_NAMES_KEY, JSON.stringify(savedNames));
+    }, [savedNames]);
+
+    // Save a player name to saved names list
+    const saveNameToList = (name) => {
+        if (!savedNames.includes(name)) {
+            setSavedNames([...savedNames, name]);
+        }
+    };
+
+    // Add a saved name to current players
+    const addFromSaved = (name) => {
+        if (players.length < 16 && !players.includes(name)) {
+            setPlayers([...players, name]);
+        }
+        setShowSavedNames(false);
+    };
+
+    // Remove from saved names
+    const removeFromSaved = (name) => {
+        setSavedNames(savedNames.filter(n => n !== name));
+    };
 
     const addPlayer = () => {
         if (players.length < 16) {
-            setPlayers([...players, `Player ${players.length + 1}`]);
+            // Generate unique player name
+            let num = players.length + 1;
+            let newName = `Player ${num}`;
+            while (players.includes(newName)) {
+                num++;
+                newName = `Player ${num}`;
+            }
+            setPlayers([...players, newName]);
         }
     };
 
@@ -57,17 +106,32 @@ export default function Lobby({ players, setPlayers, topic, setTopic, startGame,
     };
 
     // Minigame check
-    if (activeMinigame === 'spy-detector') {
-        return <SpyDetector onClose={() => setActiveMinigame(null)} />;
+    if (activeMinigame === 'code-breaker') {
+        return <CodeBreaker onClose={() => setActiveMinigame(null)} />;
     }
-    if (activeMinigame === 'memory-agent') {
-        return <MemoryAgent onClose={() => setActiveMinigame(null)} />;
+    if (activeMinigame === 'lie-detector') {
+        return <LieDetector onClose={() => setActiveMinigame(null)} />;
+    }
+    if (activeMinigame === 'evidence-collection') {
+        return <EvidenceCollection onClose={() => setActiveMinigame(null)} />;
+    }
+    if (activeMinigame === 'interrogation-room') {
+        return <InterrogationRoom onClose={() => setActiveMinigame(null)} />;
     }
 
     return (
         <div className="screen-container">
             {/* Header */}
             <header style={{ textAlign: 'center', marginBottom: 8, paddingTop: 16, position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 16, left: 0 }}>
+                    <button
+                        onClick={() => onBack && onBack()}
+                        className="btn-secondary"
+                        style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                        <ArrowLeft size={16} /> Back
+                    </button>
+                </div>
                 <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', gap: 8 }}>
                     <button
                         onClick={() => setShowAchievements(true)}
@@ -100,6 +164,22 @@ export default function Lobby({ players, setPlayers, topic, setTopic, startGame,
                         }}
                     >
                         {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                    </button>
+                    <button
+                        onClick={() => setShowThemes(true)}
+                        style={{
+                            background: 'rgba(255,255,255,0.1)',
+                            border: 'none',
+                            color: 'var(--accent-light)',
+                            padding: 8,
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                    >
+                        <Palette size={20} />
                     </button>
                 </div>
 
@@ -181,6 +261,121 @@ export default function Lobby({ players, setPlayers, topic, setTopic, startGame,
                 </div>
             )}
 
+            {/* Game Mode Selector */}
+            <div className="glass-card" style={{ padding: 0, overflow: 'hidden', marginTop: 20 }}>
+                <button
+                    onClick={() => setShowGameModes(!showGameModes)}
+                    style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '14px 16px',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer'
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Globe size={18} color="var(--accent-light)" />
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Game Modes</span>
+                        <span style={{
+                            fontSize: '0.75rem',
+                            padding: '2px 8px',
+                            background: 'var(--accent-glow)',
+                            borderRadius: 10,
+                            color: 'var(--accent-light)'
+                        }}>
+                            {gameMode === 'classic' ? '⭐ Classic' :
+                                gameMode === 'doubleagent' ? '🎭 Double Agent' :
+                                    gameMode === 'assassin' ? '🗡️ Assassin' : '🌀 Chaos'}
+                        </span>
+                    </div>
+                    {showGameModes ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
+                </button>
+
+                {showGameModes && (
+                    <div style={{ padding: '0 16px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <button
+                            onClick={() => setGameMode('classic')}
+                            style={{
+                                padding: 14,
+                                background: gameMode === 'classic' ? 'var(--accent-glow)' : 'rgba(0,0,0,0.2)',
+                                border: `1px solid ${gameMode === 'classic' ? 'var(--accent)' : 'var(--border)'}`,
+                                borderRadius: 12,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                textAlign: 'left'
+                            }}
+                        >
+                            <div style={{ fontWeight: 600, marginBottom: 4, color: gameMode === 'classic' ? 'var(--accent-light)' : 'var(--text-primary)' }}>
+                                ⭐ Classic
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                1 spy vs agents
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => setGameMode('doubleagent')}
+                            style={{
+                                padding: 14,
+                                background: gameMode === 'doubleagent' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(0,0,0,0.2)',
+                                border: `1px solid ${gameMode === 'doubleagent' ? '#a855f7' : 'var(--border)'}`,
+                                borderRadius: 12,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                textAlign: 'left'
+                            }}
+                        >
+                            <div style={{ fontWeight: 600, marginBottom: 4, color: gameMode === 'doubleagent' ? '#a855f7' : 'var(--text-primary)' }}>
+                                🎭 Double Agent
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                Spy + hidden ally
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => setGameMode('assassin')}
+                            style={{
+                                padding: 14,
+                                background: gameMode === 'assassin' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(0,0,0,0.2)',
+                                border: `1px solid ${gameMode === 'assassin' ? '#ef4444' : 'var(--border)'}`,
+                                borderRadius: 12,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                textAlign: 'left'
+                            }}
+                        >
+                            <div style={{ fontWeight: 600, marginBottom: 4, color: gameMode === 'assassin' ? '#ef4444' : 'var(--text-primary)' }}>
+                                🗡️ Assassin
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                Spy can eliminate 1
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => setGameMode('chaos')}
+                            style={{
+                                padding: 14,
+                                background: gameMode === 'chaos' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(0,0,0,0.2)',
+                                border: `1px solid ${gameMode === 'chaos' ? '#f59e0b' : 'var(--border)'}`,
+                                borderRadius: 12,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                textAlign: 'left'
+                            }}
+                        >
+                            <div style={{ fontWeight: 600, marginBottom: 4, color: gameMode === 'chaos' ? '#f59e0b' : 'var(--text-primary)' }}>
+                                🌀 Chaos
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                Random roles each round
+                            </div>
+                        </button>
+                    </div>
+                )}
+            </div>
+
             {/* Minigames Section */}
             <div className="glass-card" style={{ padding: 0, overflow: 'hidden', marginTop: 20 }}>
                 <button
@@ -205,11 +400,29 @@ export default function Lobby({ players, setPlayers, topic, setTopic, startGame,
                 </button>
 
                 {showMinigames && (
-                    <div style={{ padding: '0 16px 16px', display: 'flex', gap: 10 }}>
+                    <div style={{ padding: '0 16px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                         <button
-                            onClick={() => setActiveMinigame('spy-detector')}
+                            onClick={() => setActiveMinigame('code-breaker')}
                             style={{
-                                flex: 1,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: 16,
+                                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(124, 58, 237, 0.1))',
+                                border: '1px solid rgba(139, 92, 246, 0.3)',
+                                borderRadius: 12,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            <Lock size={24} color="#a78bfa" />
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff' }}>Code Breaker</span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Pattern puzzle</span>
+                        </button>
+                        <button
+                            onClick={() => setActiveMinigame('lie-detector')}
+                            style={{
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
@@ -222,29 +435,47 @@ export default function Lobby({ players, setPlayers, topic, setTopic, startGame,
                                 transition: 'all 0.2s ease'
                             }}
                         >
-                            <Target size={24} color="#ef4444" />
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff' }}>Spy Detector</span>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Find the spy!</span>
+                            <Activity size={24} color="#ef4444" />
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff' }}>Lie Detector</span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Quick reactions</span>
                         </button>
                         <button
-                            onClick={() => setActiveMinigame('memory-agent')}
+                            onClick={() => setActiveMinigame('evidence-collection')}
                             style={{
-                                flex: 1,
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 gap: 8,
                                 padding: 16,
-                                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(79, 70, 229, 0.1))',
-                                border: '1px solid rgba(99, 102, 241, 0.3)',
+                                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.1))',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
                                 borderRadius: 12,
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease'
                             }}
                         >
-                            <Brain size={24} color="#6366f1" />
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff' }}>Memory Agent</span>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Match cards!</span>
+                            <Search size={24} color="#10b981" />
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff' }}>Evidence Hunt</span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Find clues</span>
+                        </button>
+                        <button
+                            onClick={() => setActiveMinigame('interrogation-room')}
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: 16,
+                                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1))',
+                                border: '1px solid rgba(245, 158, 11, 0.3)',
+                                borderRadius: 12,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            <MessageSquare size={24} color="#f59e0b" />
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff' }}>Interrogation</span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Rapid answers</span>
                         </button>
                     </div>
                 )}
@@ -267,15 +498,90 @@ export default function Lobby({ players, setPlayers, topic, setTopic, startGame,
                             {players.length}/{players.length >= 3 ? '16' : '3'}
                         </span>
                     </div>
-                    <button
-                        className="btn-primary"
-                        onClick={addPlayer}
-                        disabled={players.length >= 16}
-                        style={{ width: 'auto', padding: '8px 14px', fontSize: '0.85rem' }}
-                    >
-                        <Plus size={16} />
-                        Add
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, position: 'relative' }}>
+                        {/* Saved Names Dropdown Button */}
+                        <button
+                            onClick={() => setShowSavedNames(!showSavedNames)}
+                            disabled={savedNames.length === 0}
+                            style={{
+                                background: savedNames.length > 0 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)',
+                                border: 'none',
+                                borderRadius: 8,
+                                padding: '8px 10px',
+                                cursor: savedNames.length > 0 ? 'pointer' : 'default',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                opacity: savedNames.length === 0 ? 0.4 : 1,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <Bookmark size={16} color="var(--text-secondary)" />
+                            {savedNames.length > 0 && (
+                                <span style={{
+                                    fontSize: '0.7rem',
+                                    fontWeight: 600,
+                                    color: 'var(--text-muted)'
+                                }}>
+                                    {savedNames.length}
+                                </span>
+                            )}
+                        </button>
+
+                        {/* Saved Names Dropdown */}
+                        {showSavedNames && savedNames.length > 0 && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                marginTop: 4,
+                                background: 'var(--bg-card)',
+                                border: '1px solid var(--border)',
+                                borderRadius: 12,
+                                padding: 8,
+                                minWidth: 180,
+                                zIndex: 100,
+                                boxShadow: '0 10px 40px rgba(0,0,0,0.4)'
+                            }}>
+                                {savedNames.map((name, i) => (
+                                    <div key={i} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        padding: '8px 10px',
+                                        borderRadius: 8,
+                                        cursor: 'pointer',
+                                        transition: 'background 0.2s'
+                                    }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                    >
+                                        <span
+                                            onClick={() => addFromSaved(name)}
+                                            style={{ flex: 1, fontSize: '0.9rem' }}
+                                        >
+                                            {name}
+                                        </span>
+                                        <X
+                                            size={14}
+                                            onClick={(e) => { e.stopPropagation(); removeFromSaved(name); }}
+                                            style={{ opacity: 0.5, cursor: 'pointer' }}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <button
+                            className="btn-primary"
+                            onClick={addPlayer}
+                            disabled={players.length >= 16}
+                            style={{ width: 'auto', padding: '8px 14px', fontSize: '0.85rem' }}
+                        >
+                            <Plus size={16} />
+                            Add
+                        </button>
+                    </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -320,18 +626,33 @@ export default function Lobby({ players, setPlayers, topic, setTopic, startGame,
                                     <Edit2 size={12} style={{ opacity: 0.3 }} />
                                 </span>
                             )}
-                            <X
-                                size={16}
-                                onClick={() => removePlayer(i)}
-                                style={{
-                                    cursor: 'pointer',
-                                    opacity: 0.3,
-                                    flexShrink: 0,
-                                    transition: 'opacity 0.2s'
-                                }}
-                                onMouseEnter={(e) => e.target.style.opacity = 1}
-                                onMouseLeave={(e) => e.target.style.opacity = 0.3}
-                            />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {/* Save to list button */}
+                                <Bookmark
+                                    size={16}
+                                    onClick={() => saveNameToList(name)}
+                                    fill={savedNames.includes(name) ? 'var(--accent)' : 'none'}
+                                    color={savedNames.includes(name) ? 'var(--accent)' : 'currentColor'}
+                                    style={{
+                                        cursor: 'pointer',
+                                        opacity: savedNames.includes(name) ? 1 : 0.3,
+                                        flexShrink: 0,
+                                        transition: 'all 0.2s'
+                                    }}
+                                />
+                                <X
+                                    size={16}
+                                    onClick={() => removePlayer(i)}
+                                    style={{
+                                        cursor: 'pointer',
+                                        opacity: 0.3,
+                                        flexShrink: 0,
+                                        transition: 'opacity 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.opacity = 1}
+                                    onMouseLeave={(e) => e.target.style.opacity = 0.3}
+                                />
+                            </div>
                         </div>
                     ))}
                     {players.length === 0 && (
@@ -446,6 +767,7 @@ export default function Lobby({ players, setPlayers, topic, setTopic, startGame,
             )}
 
             {showAchievements && <Achievements onClose={() => setShowAchievements(false)} />}
+            {showThemes && <ThemeSelector onClose={() => setShowThemes(false)} />}
         </div>
     );
 }

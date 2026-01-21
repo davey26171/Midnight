@@ -55,7 +55,7 @@ const sanitizeInput = (input) => {
 };
 
 // AI-powered word generation using Groq API (Llama 3.1 8B Instant - free and fast)
-const generateWordsFromTopic = async (topicInput) => {
+const generateWordsFromTopic = async (topicInput, excludeList = []) => {
     const apiKey = import.meta.env.VITE_GROQ_API_KEY;
 
     // SECURITY: Validate API key exists
@@ -74,6 +74,11 @@ const generateWordsFromTopic = async (topicInput) => {
 
     try {
         console.log('Requesting words for topic:', sanitizedTopic);
+
+        const excludeStr = excludeList.length > 0
+            ? `Do NOT include any of these previously used words: ${excludeList.join(', ')}.`
+            : '';
+
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -85,7 +90,10 @@ const generateWordsFromTopic = async (topicInput) => {
                 messages: [{
                     role: 'user',
                     // SECURITY: Use sanitized input in prompt
-                    content: `Generate exactly 8 short, specific items related to "${sanitizedTopic}". These will be used in a spy game where players need to guess a secret word. Make them specific and recognizable. Return ONLY the items as a comma-separated list, nothing else.`
+                    content: `Generate exactly 8 precise examples that belong to the category "${sanitizedTopic}". 
+                    STRICTLY instances of the category, not just related concepts. (e.g. if category is 'Countries', return 'France', not 'Paris'. if category is 'Colors', return 'Blue', not 'Sky').
+                    ${excludeStr}
+                    Return ONLY the items as a comma-separated list, nothing else.`
                 }],
                 temperature: 0.7,
                 max_tokens: 150
@@ -119,16 +127,21 @@ const generateWordsFromTopic = async (topicInput) => {
 
 
 export const GameEngineProvider = ({ children }) => {
-    const [gameState, setGameState] = useState('HOME'); // HOME, LOBBY, REVEAL, PLAYING, RESULTS
+    const [gameState, setGameState] = useState('HOME');
     const [players, setPlayers] = useState(['Player 1', 'Player 2', 'Player 3']);
+    const [originalPlayers, setOriginalPlayers] = useState([]);
     const [topic, setTopic] = useState('Places');
     const [customWord, setCustomWord] = useState('');
-    const [timer, setTimer] = useState(300); // 5 minutes in seconds
+    const [timer, setTimer] = useState(300);
     const [spyCount, setSpyCount] = useState(1);
+    const [gameMode, setGameMode] = useState('classic');
+    const [wordHistory, setWordHistory] = useState([]); // Track used words
     const [gameData, setGameData] = useState({
         spies: [],
+        doubleAgent: null,
         word: '',
-        revealedCount: 0
+        revealedCount: 0,
+        roleMap: {}
     });
 
     // Save game when entering PLAYING state
@@ -147,6 +160,11 @@ export const GameEngineProvider = ({ children }) => {
         if (gameState.startsWith('RESULTS_')) {
             clearSavedGame();
 
+            // Restore original players so they're not missing in next game
+            if (originalPlayers.length > 0) {
+                setPlayers(originalPlayers);
+            }
+
             // Update Stats
             try {
                 const stats = JSON.parse(localStorage.getItem('midnight_stats') || '{"played":0,"spyWins":0,"agentWins":0}');
@@ -164,27 +182,133 @@ export const GameEngineProvider = ({ children }) => {
         // Clear any previous save
         clearSavedGame();
 
-        const activeWords = customTopicWords.length > 0 ? customTopicWords : TOPICS[topic];
+        // Store original player roster for restoration after game ends
+        setOriginalPlayers([...players]);
+
+        let activeWords = customTopicWords.length > 0 ? customTopicWords : TOPICS[topic];
         if (activeWords.length === 0) return;
 
-        const randomWord = activeWords[Math.floor(Math.random() * activeWords.length)];
+        // Filter out recently used words
+        const availableWords = activeWords.filter(w => !wordHistory.includes(w));
 
-        // Select multiple spies
+        // If all words used, fall back to full list (or maybe just recycle oldest? for now full list)
+        const candidates = availableWords.length > 0 ? availableWords : activeWords;
+
+        const randomWord = candidates[Math.floor(Math.random() * candidates.length)];
+
+        // Update history (keep last 20)
+        setWordHistory(prev => {
+            const newHistory = [...prev, randomWord];
+            if (newHistory.length > 20) newHistory.shift();
+            return newHistory;
+        });
+
         let currentSpies = [];
-        let availableIndices = Array.from({ length: players.length }, (_, i) => i);
+        let doubleAgent = null;
+        let assassinTarget = null;
+        let roleMap = {};
 
-        for (let i = 0; i < spyCount; i++) {
-            if (availableIndices.length === 0) break;
-            const randomIndex = Math.floor(Math.random() * availableIndices.length);
-            const spyIndex = availableIndices[randomIndex];
+        // Role assignment based on game mode
+        if (gameMode === 'classic') {
+            // Classic mode: 1 spy
+            let availableIndices = Array.from({ length: players.length }, (_, i) => i);
+            const spyIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
             currentSpies.push(players[spyIndex]);
-            availableIndices.splice(randomIndex, 1);
+            roleMap[players[spyIndex]] = 'spy';
+            availableIndices = availableIndices.filter(i => i !== spyIndex);
+
+            // Assign remaining players as agents
+            availableIndices.forEach(idx => {
+                roleMap[players[idx]] = 'agent';
+            });
+        } else if (gameMode === 'multispy') {
+            // Multiple Spies: 2+ spies
+            const effectiveSpyCount = spyCount;
+            let availableIndices = Array.from({ length: players.length }, (_, i) => i);
+
+            for (let i = 0; i < effectiveSpyCount; i++) {
+                if (availableIndices.length === 0) break;
+                const randomIndex = Math.floor(Math.random() * availableIndices.length);
+                const spyIndex = availableIndices[randomIndex];
+                currentSpies.push(players[spyIndex]);
+                roleMap[players[spyIndex]] = 'spy';
+                availableIndices.splice(randomIndex, 1);
+            }
+
+            // Assign remaining players as agents
+            availableIndices.forEach(idx => {
+                roleMap[players[idx]] = 'agent';
+            });
+        } else if (gameMode === 'doubleagent') {
+            // Double Agent mode: 1 spy + 1 double agent (appears as agent but helps spy)
+            let availableIndices = Array.from({ length: players.length }, (_, i) => i);
+
+            // Pick spy
+            const spyIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+            currentSpies.push(players[spyIndex]);
+            roleMap[players[spyIndex]] = 'spy';
+            availableIndices = availableIndices.filter(i => i !== spyIndex);
+
+            // Pick double agent
+            const daIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+            doubleAgent = players[daIndex];
+            roleMap[players[daIndex]] = 'doubleagent';
+            availableIndices = availableIndices.filter(i => i !== daIndex);
+
+            // Assign remaining as agents
+            availableIndices.forEach(idx => {
+                roleMap[players[idx]] = 'agent';
+            });
+        } else if (gameMode === 'assassin') {
+            // Assassin mode: 1 spy who can eliminate 1 player silently
+            let availableIndices = Array.from({ length: players.length }, (_, i) => i);
+            const spyIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+            currentSpies.push(players[spyIndex]);
+            roleMap[players[spyIndex]] = 'assassin';
+            availableIndices = availableIndices.filter(i => i !== spyIndex);
+
+            // Assign remaining players as agents
+            availableIndices.forEach(idx => {
+                roleMap[players[idx]] = 'agent';
+            });
+        } else if (gameMode === 'chaos') {
+            // Chaos mode: Random mix of roles
+            let availableIndices = Array.from({ length: players.length }, (_, i) => i);
+
+            // Always 1 spy
+            const spyIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+            currentSpies.push(players[spyIndex]);
+            roleMap[players[spyIndex]] = 'spy';
+            availableIndices = availableIndices.filter(i => i !== spyIndex);
+
+            // Maybe add 1 double agent (50% chance)
+            if (availableIndices.length > 1 && Math.random() > 0.5) {
+                const daIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+                doubleAgent = players[daIndex];
+                roleMap[players[daIndex]] = 'doubleagent';
+                availableIndices = availableIndices.filter(i => i !== daIndex);
+            }
+
+            // Maybe add 1 innocent (doesn't know word, 30% chance)
+            if (availableIndices.length > 1 && Math.random() > 0.7) {
+                const innocentIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+                roleMap[players[innocentIndex]] = 'innocent';
+                availableIndices = availableIndices.filter(i => i !== innocentIndex);
+            }
+
+            // Assign remaining as agents
+            availableIndices.forEach(idx => {
+                roleMap[players[idx]] = 'agent';
+            });
         }
 
         setGameData({
             spies: currentSpies,
+            doubleAgent,
+            assassinTarget,
             word: randomWord,
-            revealedCount: 0
+            revealedCount: 0,
+            roleMap
         });
         setGameState('REVEAL');
     };
@@ -203,8 +327,22 @@ export const GameEngineProvider = ({ children }) => {
 
     const resetGame = () => {
         clearSavedGame();
+        // Reset players to fresh list to fix duplication bug
+        setPlayers(['Player 1', 'Player 2', 'Player 3']);
+        setSpyCount(1);
+        setGameMode('classic');
+        setGameData({
+            spies: [],
+            doubleAgent: null,
+            word: '',
+            revealedCount: 0,
+            roleMap: {}
+        });
         setGameState('HOME');
     };
+
+    // Wrapper for AI generation that injects history
+    const handleGenerateWords = (t) => generateWordsFromTopic(t, wordHistory);
 
     return (
         <>
@@ -214,12 +352,13 @@ export const GameEngineProvider = ({ children }) => {
                     topic, setTopic,
                     timer, setTimer,
                     spyCount, setSpyCount,
+                    gameMode, setGameMode,
                     gameState, setGameState,
                     gameData, setGameData,
                     startGame, resetGame, continueGame,
                     hasSavedGame: hasSavedGame(),
                     TOPICS,
-                    generateWordsFromTopic,
+                    generateWordsFromTopic: handleGenerateWords,
                     sanitizeInput // Export for components to use
                 })
             )}
